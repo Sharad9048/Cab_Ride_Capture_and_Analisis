@@ -1,7 +1,7 @@
 import threading,os,time
 
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType,StructField,StringType,IntegerType,FloatType,TimestampType
+from pyspark.sql.types import StructType,StructField,StringType,IntegerType,DoubleType,TimestampType,LongType
 from pyspark.sql.functions import col   ,from_json
 
 from pyspark.streaming.context import StreamingContext
@@ -44,15 +44,15 @@ rawDf = spark.readStream\
 .format("kafka")\
 .option("kafka.bootstrap.servers"," 18.211.252.152:9092")\
 .option("subscribe","de-capstone3")\
-.option('startingOffset','earliest')\
+.option('startingOffsets','earliest')\
 .load()
 
 schema = StructType([
-    StructField('customer_id',IntegerType(),False),
+    StructField('customer_id',LongType(),False),
     StructField('app_version',StringType(),False),
     StructField('OS_version',StringType(),False),
-    StructField('lat',FloatType(),False),
-    StructField('lon',FloatType(),False),
+    StructField('lat',DoubleType(),False),
+    StructField('lon',DoubleType(),False),
     StructField('page_id',StringType(),False),
     StructField('button_id',StringType(),False),
     StructField('is_button_click',StringType(),False),
@@ -60,18 +60,27 @@ schema = StructType([
     StructField('is_scroll_up',StringType(),False),
     StructField('is_scroll_down',StringType(),False),
     StructField('timestamp',TimestampType(),False),
-    
 ])
 
-clickStreamDf = rawDf\
-.select(from_json(col("value").cast("string"),schema).alias('data'))\
-.select('data.*')
+clickStreamDf = rawDf.select(from_json(col('value').cast('string'),schema))
+# .select(from_json(col("value").cast("string"),schema).alias('data'))\
+# .select('data.*')
+
 
 
 clickStreamQuery = clickStreamDf\
 .writeStream\
-.format('json')\
-.option('path','/user/root/clickstream_raw/')\
-.option('checkpointLocation','/user/root/clickstream_raw/clickstream_raw_v1/')\
-.trigger(processingTime='10 minutes')\
+.format('console')\
+.option('truncate','false')\
+.trigger(processingTime='1 minutes')\
 .start()
+# .format('json')\
+# .outputMode('append')\
+# .option('path','/user/root/clickstream_raw/')\
+# .option('checkpointLocation','/user/root/clickstream_raw/clickstream_raw_v1/')\
+# .trigger(processingTime='1 minutes')\
+# .start()
+
+stopQuery(clickStreamQuery)
+
+clickStreamQuery.awaitTermination()
